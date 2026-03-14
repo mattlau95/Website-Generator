@@ -8,24 +8,26 @@ from inline_markdown import split_nodes_delimiter, extract_markdown_links, extra
 import block_markdown
 from copystatic import copy_files_recursive
 from pathlib import Path
+import sys
 
 dir_path_static = "./static"
-dir_path_public = "./public"
+dir_path_public = "./docs"
 dir_path_content = "./content"
 template_path = "./template.html"
     
 def main():
-    print("Deleting public directory...")
+    basepath = "/"
+    if len(sys.argv) > 1:
+        basepath = sys.argv[1]
+
+    # delete and recreate the public/docs directory
     if os.path.exists(dir_path_public):
         shutil.rmtree(dir_path_public)
 
-    print("Copying static files to public directory...")
     copy_files_recursive(dir_path_static, dir_path_public)
+    generate_pages_recursive(dir_path_content, template_path, dir_path_public, basepath)
 
-    print("Generating content...")
-    generate_pages_recursive(dir_path_content, template_path, dir_path_public)
-
-def generate_pages_recursive(dir_path_content, template_path, dest_dir_path):
+def generate_pages_recursive(dir_path_content, template_path, dest_dir_path, basepath):
     if not os.path.exists(dir_path_content):
         raise Exception(f"Source path {dir_path_content} does not exist.")
     if not os.path.exists(dest_dir_path):
@@ -39,15 +41,15 @@ def generate_pages_recursive(dir_path_content, template_path, dest_dir_path):
         if os.path.isfile(new_src) and new_src.endswith(".md"):
             print(f"copying {new_src} from {dir_path_content} to {new_dest}.")
             dest_html = str(Path(new_dest).with_suffix(".html"))
-            generate_page(new_src, template_path, dest_html)
+            generate_page(new_src, template_path, dest_html, basepath),
             # generate_page(new_src, template_path, new_dest)
         elif os.path.isdir(new_src):
-            generate_pages_recursive(new_src, template_path, new_dest)
+            generate_pages_recursive(new_src, template_path, new_dest, basepath)
     
 
 def copy_all_contents(src, dst):
     if not os.path.exists(src):
-        raise Exception(f"Sorce path {src} does not exist.")
+        raise Exception(f"Source path {src} does not exist.")
     if not os.path.exists(dst):
         os.mkdir(dst)
 
@@ -71,7 +73,7 @@ def extract_title(markdown):
                 return content
     raise Exception("No h1 header found.")   
 
-def generate_page(from_path, template_path, dest_path):
+def generate_page(from_path, template_path, dest_path, basepath):
     print(f"Generating page from {from_path} to {dest_path} using {template_path}")
     with open(f'{from_path}', 'r', encoding='utf-8') as file:
         from_markdown = file.read()
@@ -85,6 +87,8 @@ def generate_page(from_path, template_path, dest_path):
 
     template_file = template_file.replace("{{ Title }}", title)
     template_file = template_file.replace("{{ Content }}", HTML_content)
+    template_file = template_file.replace('href="/', 'href="' + basepath)
+    template_file = template_file.replace('src="/', 'src="' + basepath)
 
     with open(f'{dest_path}', 'w', encoding='utf-8') as file:
         file.write(template_file)
